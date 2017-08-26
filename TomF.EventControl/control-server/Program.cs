@@ -13,16 +13,40 @@ namespace control_server
 {
     class Program
     {
-        static TcpClient cli = new TcpClient();
+        static TcpClient cli = null;
+
+        static void Connect()
+        {
+            if (cli != null)
+            {
+                cli.Dispose();
+            }
+
+            cli = new TcpClient();
+            while (true)
+            {
+                try
+                {
+                    cli.Connect("trackerpi", 8001);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                    Thread.Sleep(1000);
+                }
+            }
+            cli.NoDelay = true;
+        }
 
         static void Main(string[] args)
         {
-            cli.Connect("trackerpi", 8001);
-
             // rf out: info broadcasts
             // rf in: requests for updates, messaging
 
             // webserver: UI for control desk
+
+            Connect();
 
             Bulletin b = new Bulletin();
             b.FreeText = "here is some free text";
@@ -56,9 +80,13 @@ ae 92 88 8a 62 40 62 ae  92 88 8a 64 40 63 03 f0
 49 53 20 66 6f 72 20 57  69 6e 33 32 c0";
 
         // M0LTE-2>APWW10,WIDE1-1,WIDE2-1:
-        const string calls = @"82 a0 ae ae 62 60  e0 9a 60 98 a8 8a 40 64
-ae 92 88 8a 62 40 62 ae  92 88 8a 64 40 63 03 f0";
-
+        const string calls = ""
++ "82 a0 ae ae 62 60 e0" // dest = APWW10
++ "9a 60 98 a8 8a 40 64" // source = M0LTE-2
++ "ae 92 88 8a 62 40 62" // digi1 = WIDE1-1
++ "ae 92 88 8a 64 40 63" // digi2 = WIDE2-1 (last)
++ "03 f0"; // control field, protocol field (both const)
+        
         private static void Send(Bulletin b)
         {
             string msg = JsonConvert.SerializeObject(b, Formatting.Indented);
@@ -71,9 +99,13 @@ ae 92 88 8a 62 40 62 ae  92 88 8a 64 40 63 03 f0";
             // however both of those bytes are far higher than anything that will show up in base64 text encoded to ASCII bytes.
             // if the encoding scheme changes, we might need to take that into account.
 
-            byte[] sendBuf = new byte[] { 0xc0, 0x00 }.Concat(HexStringToBytes(calls)).Concat(msgBytes).Concat(new byte[] { 0xc0 }).ToArray();
+            //byte[] sendBuf = new byte[] { 0xc0, 0x00 }.Concat(HexStringToBytes(calls)).Concat(msgBytes).Concat(new byte[] { 0xc0 }).ToArray();
 
-            foreach (var byt in sendBuf.Skip(1).Take(sendBuf.Length-2))
+            //byte[] sendBuf = new byte[] { 0xc0, 0x00 }.Concat(HexStringToBytes(calls)).Concat(new byte[] { 0x54, 0x45, 0x53, 0x54, 0xc0 }).ToArray();
+
+            byte[] sendBuf = HexStringToBytes(sample);
+
+            foreach (var byt in sendBuf.Skip(1).Take(sendBuf.Length - 2))
             {
                 if (byt == 0xc0)
                 {
@@ -81,14 +113,7 @@ ae 92 88 8a 62 40 62 ae  92 88 8a 64 40 63 03 f0";
                 }
             }
 
-            //byte[] sendBuf = new byte[] { 0xc0, 0x00 }.Concat(HexStringToBytes(calls)).Concat(new byte[] { 0x54, 0x45, 0x53, 0x54, 0xc0 }).ToArray();
-
-            //byte[] sendBuf = HexStringToBytes(sample);
-
-            var str = cli.GetStream();
-
-            cli.NoDelay = true;
-
+            
             Console.WriteLine("waiting");
             var key = Console.ReadKey();
             if (key.KeyChar == 'x')
@@ -96,35 +121,46 @@ ae 92 88 8a 62 40 62 ae  92 88 8a 64 40 63 03 f0";
 
             while (true)
             {
-                //str.Write(new byte[] { 0x0d }, 0, 1);
-                str.Write(sendBuf, 0, sendBuf.Length);
-                //str.Write(new byte[] { 0x0d }, 0, 1);
+                while (true)
+                {
+                    try
+                    {
+                        var str = cli.GetStream();
+                        str.Write(sendBuf, 0, sendBuf.Length);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                        Connect();
+                    }
+
+                    Thread.Sleep(5000);
+                }
+
+                Thread.Sleep(15000);
+                continue;
 
                 Console.WriteLine("press enter or x");
                 var key1 = Console.ReadKey();
                 if (key1.KeyChar == 'x')
                     return;
             }
-
         }
 
         private static byte[] HexStringToBytes(string sample)
         {
             List<byte> bytes = new List<byte>();
 
-            foreach (var line in sample.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries))
+            sample = sample.Replace("\r", "").Replace("\n", "").Replace("\t", "").Replace(" ", "");
+
+            for (int i=0; i<sample.Length;i+=2)
             {
-                if (String.IsNullOrWhiteSpace(line))
-                {
-                    continue;
-                }
+                string token = new String(new[] { sample[i], sample[i + 1] });
 
-                foreach (var token in line.Split(' ').Select(t=>t.Trim()).Where(t=>!string.IsNullOrWhiteSpace(t)))
-                {
-                    byte b = Convert.ToByte(token, 16);
+                byte b = Convert.ToByte(token, 16);
 
-                    bytes.Add(b);
-                }
+                bytes.Add(b);
             }
 
             return bytes.ToArray();
