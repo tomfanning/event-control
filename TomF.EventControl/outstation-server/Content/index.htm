@@ -20,12 +20,15 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="#">EventControl</a>
+                <a class="navbar-brand" href="#" id="title">EventControl</a>
             </div>
             <div id="navbar" class="collapse navbar-collapse">
                 <ul class="nav navbar-nav">
                     <li><a href="/">Home</a></li>
                 </ul>
+                <p class="nav navbar-text navbar-right">
+                    Connection <span id="conn" style="color:white;">unknown</span>
+                </p>
             </div>
         </div>
     </nav>
@@ -44,7 +47,7 @@
         </div>
     </header>-->
 
-    <div class="container">
+    <div class="container" style="padding-top: 8rem">
         <h2>Hover Rows</h2>
         <p>The .table-hover class enables a hover state on table rows:</p>
         <table id="table" class="table table-hover">
@@ -66,8 +69,8 @@
 
     <script>
 
-        var lastComms;
         var lastNum = 0;
+        var difficulties = false;
 
         function process(data) {
             
@@ -85,31 +88,78 @@
             return retArr;
         }
 
-        var done = true;
+        var done = false;
 
         function getJson() {
-            // this json call will return true immediately if there is new data, else it will block until either:
-            //   - there is new data within 60 secs, then it will return true
-            //   - else after 60 seconds it will return false
-            $.getJSON("/api/v1/longpoll/table/1?last=" + lastNum, function (data) {
-                done = true;
-                if (data == true) {
-                    refreshTable();
+            $.ajax({ 
+                dataType: "json",
+                url: "/api/v1/longpoll/table/1?last=" + lastNum,
+                timeout: 15000,
+                success: function(data){
+                    difficulties = false;
+                    if (data.status == "updateAvailable") {
+                        refreshTable();
+                    } else if (data.status == "higherThanIssued") {
+                        // server has reset
+                        lastNum = 0;
+                        refreshTable();
+                    }
+                    done = true;
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    difficulties = true;
+                    done = true;
                 }
             });
         }
 
-        setInterval(function () {
-            if (done) {
-                done = false;
-                getJson();
-            }
-        }, 1000);
+        function getJson2() {
+            // this json call will return true immediately if there is new data, else it will block until either:
+            //   - there is new data within 60 secs, then it will return true
+            //   - else after 60 seconds it will return false
+            $.getJSON("/api/v1/longpoll/table/1?last=" + lastNum, function (data) {
+                difficulties = false;
+                if (data.status == "updateAvailable") {
+                    refreshTable();
+                } else if (data.status == "higherThanIssued") {
+                    // server has reset
+                    lastNum = 0;
+                    refreshTable();
+                }
+                done = true;
+                //}).fail(function(jqXHR, textStatus, errorThrown) { console.log('getJSON request failed! ' + textStatus); });
+                }).fail(function (jqXHR, textStatus, errorThrown) {
+                    difficulties = true; done = true;
+                    alert(textStatus);
+                });
+            //}).error(function () { alert("error"); });
+        }
+
+        $(document).ready(function () {
+            getJson();
+            setInterval(function () {
+                if (done) {
+                    done = false;
+                    getJson();
+                }
+            }, 1000);
+            setInterval(function () {
+                if (difficulties) {
+                    $('#conn').text("difficulties");
+                    $('#conn').css('color', 'red');
+                    $('#title').css('color', 'red');
+                } else {
+                    $('#conn').text("ok");
+                    $('#conn').css('color', 'lime');
+                    $('#title').css('color', 'lime');
+                }
+            }, 1000);
+        });
 
         function refreshTable(){
             var prom = $.getJSON("/api/v1/data/table/1", function (data) {
 
-                lastComms = Date.now();
+                difficulties = false;
                 lastNum = data.serial;
 
                 var cols = [];
@@ -122,10 +172,10 @@
                     columns: cols,
                     data: process(data)
                 });
+            }).fail(function () {
+                difficulties = true;
             });
         }
-
-        //setTimeout(function () { p.abort(); }, 2000);
 
     </script>
 </body>
