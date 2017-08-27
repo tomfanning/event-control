@@ -5,9 +5,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="" />
-    <title>Bootstrap Template</title>
+    <title>EventControl</title>
     <link rel="stylesheet" href="bootstrap-3.3.7.min.css" />
-    <!--<link rel="stylesheet" href="//cdn.rawgit.com/tonystar/bootstrap-plugins/master/dist/css/bootstrap-plugins.min.css" />-->
     <link rel="stylesheet" href="font-awesome-4.7.0.min.css" />
     <link rel="stylesheet" href="bootstrap-table-1.11.0.min.css" />
     <!--link rel="stylesheet" href="custom.css"/-->
@@ -21,18 +20,16 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="#">Bootstrap Template</a>
+                <a class="navbar-brand" href="#">EventControl</a>
             </div>
             <div id="navbar" class="collapse navbar-collapse">
                 <ul class="nav navbar-nav">
-                    <li><a href="http://bootstrap.tonystar.me/template" target="_blank">Homepage</a></li>
-                    <li><a href="https://github.com/tonystar/bootstrap-template" target="_blank">Source</a></li>
-                    <li><a href="http://codepen.io/tonystar/full/pJpROO/" target="_blank">Demo</a></li>
+                    <li><a href="/">Home</a></li>
                 </ul>
             </div>
         </div>
     </nav>
-    <header class="jumbotron text-center" style="padding-top: 8rem">
+    <!--<header class="jumbotron text-center" style="padding-top: 8rem">
         <div class="container">
             <h1>Bootstrap Template</h1>
             <p>
@@ -45,7 +42,7 @@
                 <a href="http://codepen.io/tonystar/pen/pJpROO" class="btn btn-default btn-lg">Fork on &nbsp;<i class="fa fa-codepen"></i></a>
             </div>
         </div>
-    </header>
+    </header>-->
 
     <div class="container">
         <h2>Hover Rows</h2>
@@ -53,9 +50,9 @@
         <table id="table" class="table table-hover">
             <thead>
                 <tr>
-                    <th data-field="id">Item ID</th>
+                    <!--<th data-field="id">Item ID</th>
                     <th data-field="name">Item Name</th>
-                    <th data-field="price">Item Price</th>
+                    <th data-field="price">Item Price</th>-->
                 </tr>
             </thead>
         </table>
@@ -69,26 +66,67 @@
 
     <script>
 
-        var $table = $('#table');
-        var mydata =
-        [
-            {
-                "id": 0,
-                "name": "test0",
-                "price": "$0"
-            },
-            {
-                "id": 1,
-                "name": "test1",
-                "price": "$1"
-            }
-        ];
+        var lastComms;
+        var lastNum = 0;
 
-        $(function () {
-            $('#table').bootstrapTable({
-                data: mydata
+        function process(data) {
+            
+            var retArr = new Array();
+            $.each(data.data, function (key, val) {
+                var newItem = new Object();
+                
+                for (i = 0; i < data.headers.length; i++){
+                    newItem[data.headers[i]] = val[i];
+                }
+
+                retArr.push(newItem);
             });
-        });
+
+            return retArr;
+        }
+
+        var done = true;
+
+        function getJson() {
+            // this json call will return true immediately if there is new data, else it will block until either:
+            //   - there is new data within 60 secs, then it will return true
+            //   - else after 60 seconds it will return false
+            $.getJSON("/api/v1/longpoll/table/1?last=" + lastNum, function (data) {
+                done = true;
+                if (data == true) {
+                    refreshTable();
+                }
+            });
+        }
+
+        setInterval(function () {
+            if (done) {
+                done = false;
+                getJson();
+            }
+        }, 1000);
+
+        function refreshTable(){
+            var prom = $.getJSON("/api/v1/data/table/1", function (data) {
+
+                lastComms = Date.now();
+                lastNum = data.serial;
+
+                var cols = [];
+                for (i = 0; i < data.headers.length; i++) {
+                    cols.push({ field: data.headers[i], title: data.headers[i], sortable: true });
+                }
+
+                $('#table').bootstrapTable('destroy');
+                $('#table').bootstrapTable({
+                    columns: cols,
+                    data: process(data)
+                });
+            });
+        }
+
+        //setTimeout(function () { p.abort(); }, 2000);
+
     </script>
 </body>
 </html>
