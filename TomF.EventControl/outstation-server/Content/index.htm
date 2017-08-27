@@ -113,28 +113,6 @@
             });
         }
 
-        function getJson2() {
-            // this json call will return true immediately if there is new data, else it will block until either:
-            //   - there is new data within 60 secs, then it will return true
-            //   - else after 60 seconds it will return false
-            $.getJSON("/api/v1/longpoll/table/1?last=" + lastNum, function (data) {
-                difficulties = false;
-                if (data.status == "updateAvailable") {
-                    refreshTable();
-                } else if (data.status == "higherThanIssued") {
-                    // server has reset
-                    lastNum = 0;
-                    refreshTable();
-                }
-                done = true;
-                //}).fail(function(jqXHR, textStatus, errorThrown) { console.log('getJSON request failed! ' + textStatus); });
-                }).fail(function (jqXHR, textStatus, errorThrown) {
-                    difficulties = true; done = true;
-                    alert(textStatus);
-                });
-            //}).error(function () { alert("error"); });
-        }
-
         $(document).ready(function () {
             getJson();
             setInterval(function () {
@@ -156,24 +134,29 @@
             }, 1000);
         });
 
-        function refreshTable(){
-            var prom = $.getJSON("/api/v1/data/table/1", function (data) {
+        function refreshTable() {
+            $.ajax({
+                dataType: "json",
+                url: "/api/v1/data/table/1",
+                timeout: 2000,
+                success: function (data) {
+                    difficulties = false;
+                    lastNum = data.serial;
 
-                difficulties = false;
-                lastNum = data.serial;
+                    var cols = [];
+                    for (i = 0; i < data.headers.length; i++) {
+                        cols.push({ field: data.headers[i], title: data.headers[i], sortable: true });
+                    }
 
-                var cols = [];
-                for (i = 0; i < data.headers.length; i++) {
-                    cols.push({ field: data.headers[i], title: data.headers[i], sortable: true });
+                    $('#table').bootstrapTable('destroy');
+                    $('#table').bootstrapTable({
+                        columns: cols,
+                        data: process(data)
+                    });
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    difficulties = true;
                 }
-
-                $('#table').bootstrapTable('destroy');
-                $('#table').bootstrapTable({
-                    columns: cols,
-                    data: process(data)
-                });
-            }).fail(function () {
-                difficulties = true;
             });
         }
 
