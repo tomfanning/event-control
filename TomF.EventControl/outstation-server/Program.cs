@@ -4,9 +4,12 @@ using Nancy.Conventions;
 using Nancy.ErrorHandling;
 using Nancy.Hosting.Self;
 using Nancy.Responses;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -29,6 +32,9 @@ namespace outstation_server
             server.Start();
             Console.WriteLine("started!");
             Console.WriteLine("press any key to exit");
+
+            DataManager.Topics.Add(new Table { ID = 100, Issued = DateTimeOffset.Parse("2017-08-27 13:00Z"), Name = "Test table", Serial = 1, Headers = new[] { "col1", "col2" }, Data = new string[][] { new string[] { "a1", "b1" }, new string[] { "a2", "b2" } } });
+            DataManager.Topics.Add(new FreeText { ID = 200, Issued = DateTimeOffset.Parse("2017-08-27 13:15Z"), Name = "Test free text", Serial = 1, Content = "Hello world\r\nthis is a second line"});
 
             //Process.Start("http://localhost:8282");
             Console.ReadKey();
@@ -76,22 +82,116 @@ namespace outstation_server
         }
     }
 
+    public static class DataManager
+    {
+        static DataManager()
+        {
+            Topics = new List<Topic>();
+        }
+
+        public static List<Topic> Topics { get; set; }
+    }
+
+    public class Topic
+    {
+        public int ID { get; set; }
+        public string Name { get; set; }
+        public int Serial { get; set; }
+        public DateTimeOffset Issued { get; set; }
+        public string Type { get; set; }
+    }
+
+    public class Table : Topic
+    {
+        public Table()
+        {
+            Type = GetType().Name;
+        }
+
+        public string[] Headers { get; set; }
+        public string[][] Data { get; set; }
+    }
+
+    public class FreeText : Topic
+    {
+        public FreeText()
+        {
+            Type = GetType().Name;
+        }
+
+        public string Content { get; set; }
+    }
+
+    public class JsonNetSerializer : ISerializer
+    {
+        private readonly JsonSerializer _serializer;
+
+        public JsonNetSerializer()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                Formatting = Formatting.Indented,
+            };
+
+            _serializer = JsonSerializer.Create(settings);
+        }
+
+        public IEnumerable<string> Extensions
+        {
+            get
+            {
+                return new string[0];
+            }
+        }
+
+        public bool CanSerialize(string contentType)
+        {
+            return contentType == "application/json";
+        }
+
+        public void Serialize<TModel>(string contentType, TModel model, Stream outputStream)
+        {
+            using (var writer = new JsonTextWriter(new StreamWriter(outputStream)))
+            {
+                _serializer.Serialize(writer, model);
+                writer.Flush();
+            }
+        }
+    }
+
     public class ApiModule : NancyModule
     {
         public ApiModule() : base("/api/v1")
         {
             Get["/data/table/{number}"] = parameters => { return GetTable(parameters); };
-            Get["/longpoll/table/{number}"] = parameters => { return TableHasUpdate(parameters); };
+            Get["/longpoll/table/{number}"] = parameters => { return TopicHasUpdate(parameters); };
+            Get["/topics"] = parameters => { return Response.AsJson(GetTopics()); };
         }
 
-        int serverLatestUpdateNum { get { return (int)(DateTime.Now - DateTime.Today).TotalSeconds / 10; } }
+        private Topic[] GetTopics()
+        {
+            return DataManager.Topics.Select(t => new Topic
+            {
+                ID = t.ID,
+                Issued = t.Issued,
+                Name = t.Name,
+                Serial = t.Serial,
+                Type = t.Type
+            }).ToArray();
+        }
 
-        private dynamic TableHasUpdate(dynamic parameters)
+        private dynamic TopicHasUpdate(dynamic parameters)
         {
             int tableNum = int.Parse(parameters.number);
             int clientLastUpdateNum = int.Parse(this.Request.Query["last"]);
 
-            if (clientLastUpdateNum > serverLatestUpdateNum)
+            var topic = DataManager.Topics.SingleOrDefault(t => t.ID == tableNum);
+
+            if (topic == null)
+                return new { status = "invalidTopic" };
+
+            if (clientLastUpdateNum > topic.Serial)
             {
                 return new { status = "higherThanIssued" };
             }
@@ -100,12 +200,12 @@ namespace outstation_server
 
             while (sw.Elapsed < TimeSpan.FromMinutes(1))
             {
-                if (serverLatestUpdateNum > clientLastUpdateNum)
+                if (topic.Serial > clientLastUpdateNum)
                 {
                     return new { status = "updateAvailable" };
                 }
 
-                Thread.Sleep(1000);
+                Thread.Sleep(100);
             }
 
             return new { status = "nothingNew" };
@@ -115,26 +215,11 @@ namespace outstation_server
         {
             int num = int.Parse(parameters.number);
 
-            int ser = serverLatestUpdateNum;
+            var topic = DataManager.Topics.SingleOrDefault(t => t.ID == num);
 
-            return new PackedData
-            {
-                Serial = ser,
-                Headers = new[] { "col1", "col2", "col3" },
-                Data = new string[][]{
-                    new[] { "test1", "test2", "test3" },
-                    new[] { "test4", "test5", "test6 " + ser }
-                }
-            };
+            return topic as Table;
         }
-    }
-
-    public class PackedData
-    {
-        public int Serial { get; set; }
-        public string[] Headers { get; set; }
-        public string[][] Data { get; set; }
-    }
+   } 
 
     public class IndexModule : NancyModule
     {
