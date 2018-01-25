@@ -35,6 +35,7 @@ namespace TomF.EventControl.Outstation
             }
 
             app.UseMvc();
+            app.UseStaticFiles();
         }
     }
 }
