@@ -109,6 +109,28 @@ namespace ax25lib
                 }
             }
         }
+
+        public byte[] ToKissFrame()
+        {
+            /*
+C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 E0  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65   03       F0      27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0
+C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65   03       F0      27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0
+FEND  Dataframe  dest----------------  source--------------  digi_1--------------   digi_2--------------   control  proto   info----------------------------  FEND
+
+no flags 0x7e, expected start and end
+no FCS, dealt with at KISS level?*/
+
+            byte[] destBytes = Dest.Bytes;
+            byte[] sourceBytes = Source.Bytes;
+            byte[] digis = GetDigiBytes(Digis);
+        }
+
+        static byte[] GetDigiBytes(AddressField[] digis)
+        {
+            var result = new byte[digis.Length * 7];
+
+            for (int i=0; i)
+        }
     }
 
     [DebuggerDisplay("{Call}")]

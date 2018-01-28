@@ -20,4 +20,10 @@ namespace ax25lib
 
         }
     }
+
+    public enum DataType
+    {
+        Undefined,
+        OldMicE,
+    }
 }
