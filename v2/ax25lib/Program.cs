@@ -68,14 +68,15 @@ namespace ax25lib
 
         static void Main()
         {
-            string call = Ax25Frame.DecodeCallsign(StringToByteArray("9A 60 98 A8 8A 40 EA"), out bool isLastAddress, out bool cBit);
-            Debugger.Break();
+            CallField call1 = Ax25Frame.DecodeCallsign(StringToByteArray("9A 60 98 A8 8A 40 EA"));
+            CallField call2 = Ax25Frame.DecodeCallsign(StringToByteArray("9A 60 98 A8 8A 40 6A"));
             //byte b = (byte)'M';
             //BitArray ba = new BitArray(new[] { b });
             //Console.WriteLine(ba.ToOnesAndZeroes());
 
             //string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 E0  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                        03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
             string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
+            //              C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0
             //              C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 6A  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 64   9A 60 98 A8 8A 40 73   03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0
             //                                                     M0LTE-5           **                                           **
             //              C0    00         AA A2 A4 AC AA A2 E0  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 E2   AE 92 88 8A 64 40 E4 9A 60 98 A8 8A 40 F3 03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D C0

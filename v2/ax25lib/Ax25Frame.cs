@@ -7,16 +7,36 @@ using System.Threading.Tasks;
 
 namespace ax25lib
 {
+    [DebuggerDisplay("{ToString()}")]
+    public class CallField
+    {
+        public CallField()
+        {
+            Bit5Reserved = Bit6Reserved = true;
+        }
+
+        public string Call { get; set; }
+        public bool CBit { get; set; }
+        public bool IsLast { get; set; }
+
+        public bool Bit5Reserved { get; set; }
+        public bool Bit6Reserved { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Call ?? "NULL"} CBit={(CBit ? 1 : 0)} IsLast={(IsLast ? 1 : 0)} Res={(Bit6Reserved ? 1 : 0)}{(Bit5Reserved ? 1 : 0)}";
+        }
+    }
     public class Ax25Frame
     {
         public Ax25Frame()
         {
-            this.Digis = new List<string>();
+            this.Digis = new List<CallField>();
         }
 
-        public string Source { get; set; }
-        public string Dest { get; set; }
-        public List<string> Digis { get; set; }
+        public CallField Source { get; set; }
+        public CallField Dest { get; set; }
+        public List<CallField> Digis { get; set; }
 
         public string Info { get; set; }
         public byte[] InfoBytes { get; set; }
@@ -36,11 +56,11 @@ namespace ax25lib
             }
 
             ax25Frame = new Ax25Frame();
-            ax25Frame.Source = DecodeCallsign(getSourceBytes(kissFrame), out bool srcIsLast, out bool sourceCBit);
-            ax25Frame.Dest = DecodeCallsign(getDestBytes(kissFrame), out bool destIsLast, out bool destCBit);
+            ax25Frame.Source = DecodeCallsign(getSourceBytes(kissFrame));
+            ax25Frame.Dest = DecodeCallsign(getDestBytes(kissFrame));
             foreach (byte[] digiField in getDigis(kissFrame))
             {
-                string call = DecodeCallsign(digiField, out bool isLast, out bool cBit);
+                CallField call = DecodeCallsign(digiField);
                 ax25Frame.Digis.Add(call);
             }
             ax25Frame.InfoBytes = getInfo(kissFrame);
@@ -127,11 +147,11 @@ no FCS, dealt with at KISS level?*/
 
             var buffer = new List<byte>();
             buffer.AddRange(new byte[] { 0xc0, 0 }); // FEND, DataFrame
-            buffer.AddRange(EncodeCallsign(Dest, last:false, cBit:false));
-            buffer.AddRange(EncodeCallsign(Source, last:false, cBit:false));
-            foreach (string digiCall in Digis)
+            buffer.AddRange(EncodeCallsign(Dest));
+            buffer.AddRange(EncodeCallsign(Source));
+            foreach (CallField digiCall in Digis)
             {
-                byte[] digiBytes = EncodeCallsign(digiCall, last: false, cBit: false);
+                byte[] digiBytes = EncodeCallsign(digiCall);
                 buffer.AddRange(digiBytes);
             }
             //byte[] myCall = EncodeCallsign("M0LTE-9", last: true, cBit:false);
@@ -144,8 +164,10 @@ no FCS, dealt with at KISS level?*/
             return buffer.ToArray();
         }
 
-        static byte[] EncodeCallsign(string callAndSsid, bool last, bool cBit)
+        static byte[] EncodeCallsign(CallField cf)
         {
+            string callAndSsid = cf.Call;
+
             var parts = (callAndSsid ?? "").Trim().Split('-');
             if (parts.Length != 1 && parts.Length != 2)
             {
@@ -190,26 +212,25 @@ no FCS, dealt with at KISS level?*/
             // bits numbered from the right, per fig 3.5 of http://www.tapr.org/pdf/AX25.2.2.pdf
 
             // bit 0 (rightmost) is the HDLC address extension bit, set to zero on all but the last octet in the address field, where it is set to one.
-            if (last)
-            {
-                result[6] = result[6].SetBit(0, last);
-            }
+            result[6] = result[6].SetBit(0, cf.IsLast);
 
             // ssid is next, it's just a 4-bit number, 0-15
             result[6] = SetSsid(result[6], ssid);
 
             // reserved bits, set to 1 when not implemented
-            result[6] = result[6].SetBit(5, true); // or should these be set to whatever they were?
-            result[6] = result[6].SetBit(6, true);
+            result[6] = result[6].SetBit(5, cf.Bit5Reserved); 
+            result[6] = result[6].SetBit(6, cf.Bit6Reserved);
 
             // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
-            result[6] = result[6].SetBit(7, cBit); // ??? should probably be whatever it was before we received it
+            result[6] = result[6].SetBit(7, cf.CBit); 
 
             return result;
         }
 
-        internal static string DecodeCallsign(byte[] addressField, out bool isLastAddress, out bool cBit)
+        internal static CallField DecodeCallsign(byte[] addressField)
         {
+            var result = new CallField();
+
             var sb = new StringBuilder();
             for (int i = 0; i < 6; i++)
             {
@@ -223,7 +244,7 @@ no FCS, dealt with at KISS level?*/
             // bits numbered from the right, per fig 3.5 of http://www.tapr.org/pdf/AX25.2.2.pdf
 
             // bit 0 (rightmost) is the HDLC address extension bit, set to zero on all but the last octet in the address field, where it is set to one.
-            isLastAddress = ssidByte.GetBit(0);
+            result.IsLast = ssidByte.GetBit(0);
 
             // ssid is next, it's just a 4-bit number, 0-15
             int ssid = GetSsid(ssidByte);
@@ -233,16 +254,18 @@ no FCS, dealt with at KISS level?*/
             bool reserved2 = ssidByte.GetBit(6);
 
             // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
-            cBit = ssidByte.GetBit(7);
+            result.CBit = ssidByte.GetBit(7);
 
             if (ssid == 0)
             {
-                return call;
+                result.Call = call;
             }
             else
             {
-                return String.Format("{0}-{1}", call, ssid);
+                result.Call = String.Format("{0}-{1}", call, ssid);
             }
+
+            return result;
         }
 
         static byte SetSsid(byte ssidByte, int ssid)
