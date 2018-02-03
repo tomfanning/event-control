@@ -17,7 +17,7 @@ namespace ax25lib
         {
             var sw = new Stopwatch();
 
-            using (var sp = new SerialPort("COM2", 38400))
+            using (var sp = new SerialPort("COM4", 38400))
             {
                 sp.Open();
 
@@ -78,7 +78,8 @@ namespace ax25lib
             byte[] frameBytes = StringToByteArray(frame);
 
             Ax25Frame.TryParse(frameBytes, out Ax25Frame f);
-            var aprsFrame = new AprsFrame(f);
+            byte[] kf = f.ToKissFrame();
+            string f2 = kf.ToHexString();
 
             //Process(frameBytes);
 

@@ -76,7 +76,7 @@ namespace Digipeater
             // set H bit
             // make sure that only last address has "last address" bit set
 
-            Ax25Frame outbound = new Ax25Frame();
+            /*Ax25Frame outbound = new Ax25Frame();
             outbound.Source = ax25Frame.Source;
             outbound.Dest = ax25Frame.Dest;
             outbound.Digis = new AddressField[ax25Frame.Digis.Length + 1];
@@ -88,7 +88,7 @@ namespace Digipeater
             outbound.Info = ax25Frame.Info;
 
             byte[] buf = outbound.ToKissFrame();
-            sp.Write(buf, 0, buf.Length);
+            sp.Write(buf, 0, buf.Length);*/
         }
     }
 }

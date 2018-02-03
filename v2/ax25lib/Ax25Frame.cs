@@ -9,16 +9,17 @@ namespace ax25lib
 {
     public class Ax25Frame
     {
-        public AddressField Source { get; set; }
-        public AddressField Dest { get; set; }
-        public AddressField[] Digis { get; set; }
+        public Ax25Frame()
+        {
+            this.Digis = new List<string>();
+        }
+
+        public string Source { get; set; }
+        public string Dest { get; set; }
+        public List<string> Digis { get; set; }
 
         public string Info { get; set; }
         public byte[] InfoBytes { get; set; }
-
-        public Ax25Frame()
-        {
-        }
 
         public static ParseResult TryParse(byte[] kissFrame, out Ax25Frame ax25Frame)
         {
@@ -35,9 +36,13 @@ namespace ax25lib
             }
 
             ax25Frame = new Ax25Frame();
-            ax25Frame.Source = new AddressField(getSourceBytes(kissFrame));
-            ax25Frame.Dest = new AddressField(getDestBytes(kissFrame));
-            ax25Frame.Digis = getDigis(kissFrame).Select(f => new AddressField(f)).ToArray();
+            ax25Frame.Source = getCallsign((getSourceBytes(kissFrame)));
+            ax25Frame.Dest = getCallsign((getDestBytes(kissFrame)));
+            foreach (byte[] digiField in getDigis(kissFrame))
+            {
+                string call = getCallsign(digiField);
+                ax25Frame.Digis.Add(call);
+            }
             ax25Frame.InfoBytes = getInfo(kissFrame);
             ax25Frame.Info = Encoding.ASCII.GetString(ax25Frame.InfoBytes);
 
@@ -120,35 +125,32 @@ FEND  Dataframe  dest----------------  source--------------  digi_1-------------
 no flags 0x7e, expected start and end
 no FCS, dealt with at KISS level?*/
 
-            byte[] destBytes = Dest.Bytes;
-            byte[] sourceBytes = Source.Bytes;
-            byte[] digis = GetDigiBytes(Digis);
-        }
+            var buffer = new List<byte>();
+            buffer.AddRange(new byte[] { 0xc0, 0 }); // FEND, DataFrame
+            buffer.AddRange(EncodeCallsign(Dest));
+            buffer.AddRange(EncodeCallsign(Source));
+            foreach (string digiCall in Digis)
+            {
+                byte[] digiBytes = EncodeCallsign(digiCall);
+                buffer.AddRange(digiBytes);
+            }
+            byte[] myCall = EncodeCallsign("M0LTE-9", last: true);
+            buffer.AddRange(myCall);
+            buffer.AddRange(new byte[] { 0x03 }); // control
+            buffer.AddRange(new byte[] { 0xF0 }); // proto
+            buffer.AddRange(InfoBytes); // info
+            buffer.AddRange(new byte[] { 0xC0 }); // FEND
 
-        static byte[] GetDigiBytes(AddressField[] digis)
+            return buffer.ToArray();
+        }
+        static byte[] EncodeCallsign(string call)
         {
-            var result = new byte[digis.Length * 7];
-
-            for (int i=0; i)
+            return EncodeCallsign(call, last: false);
         }
-    }
-
-    [DebuggerDisplay("{Call}")]
-    public class AddressField
-    {
-        public AddressField(byte[] bytes)
+        static byte[] EncodeCallsign(string call, bool last)
         {
-            this.Call = getCallsign(bytes);
-            this.Bytes = bytes;
+            return new byte[7];
         }
-
-        public AddressField(string call)
-        {
-            throw new NotImplementedException();
-        }
-
-        public string Call { get; set; }
-        public byte[] Bytes { get; set; }
 
         static string getCallsign(byte[] addressField)
         {
@@ -219,7 +221,7 @@ no FCS, dealt with at KISS level?*/
             return ssid;
         }
     }
-
+    
     public class InfoField
     {
         public string Ascii { get; set; }
