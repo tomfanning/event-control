@@ -1,0 +1,10 @@
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\obj\Debug\Digipeater.csprojResolveAssemblyReference.cache
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\obj\Debug\Digipeater.csproj.CoreCompileInputs.cache
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\Digipeater.exe.config
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\Digipeater.exe
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\Digipeater.pdb
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\ax25lib.exe
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\ax25lib.pdb
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\bin\Debug\ax25lib.exe.config
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\obj\Debug\Digipeater.exe
+C:\Users\Thomas\Desktop\event-control\v2\Digipeater\obj\Debug\Digipeater.pdb

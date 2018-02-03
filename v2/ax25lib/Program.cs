@@ -68,18 +68,24 @@ namespace ax25lib
 
         static void Main()
         {
+            string call = Ax25Frame.DecodeCallsign(StringToByteArray("9A 60 98 A8 8A 40 EA"), out bool isLastAddress, out bool cBit);
+            Debugger.Break();
             //byte b = (byte)'M';
             //BitArray ba = new BitArray(new[] { b });
             //Console.WriteLine(ba.ToOnesAndZeroes());
 
-            //string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 E0  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65   03       F0      27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
-            string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65   03       F0      27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
+            //string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 E0  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                        03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
+            string frame = "C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0";
+            //              C0    00         AA A2 A4 AC AA A2 60  9A 60 98 A8 8A 40 6A  AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 64   9A 60 98 A8 8A 40 73   03 F0   27 77 59 44 6C 20 1C 5B 2F 3E 0D  C0
+            //                                                     M0LTE-5           **                                           **
+            //              C0    00         AA A2 A4 AC AA A2 E0  9A 60 98 A8 8A 40 EA  AE 92 88 8A 62 40 E2   AE 92 88 8A 64 40 E4 9A 60 98 A8 8A 40 F3 03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D C0
 
             byte[] frameBytes = StringToByteArray(frame);
 
             Ax25Frame.TryParse(frameBytes, out Ax25Frame f);
             byte[] kf = f.ToKissFrame();
-            string f2 = kf.ToHexString();
+            string s2 = kf.ToHexString();
+            Ax25Frame.TryParse(StringToByteArray(s2), out Ax25Frame f2);
 
             //Process(frameBytes);
 
@@ -145,10 +151,10 @@ no FCS, dealt with at KISS level?*/
                 Console.WriteLine("Digi: {0} (last:{1})", getCallsign(d, out isLast), isLast ? "yes" : "no");
             }
 
-                //https://www.tapr.org/pub_ax25.html#2.2.13
-                //http://www.aprs.org/doc/APRS101.PDF
-                //http://destevez.net/2016/06/kiss-hdlc-ax-25-and-friends/
-            }
+            //https://www.tapr.org/pub_ax25.html#2.2.13
+            //http://www.aprs.org/doc/APRS101.PDF
+            //http://destevez.net/2016/06/kiss-hdlc-ax-25-and-friends/
+        }
 
         static byte[] getInfo(byte[] frame)
         {
@@ -290,9 +296,20 @@ no FCS, dealt with at KISS level?*/
     {
         public static bool GetBit(this byte b, int bitNumber)
         {
-            var bit = (b & (1 << bitNumber)) != 0;
+            bool bit = (b & (1 << bitNumber)) != 0;
 
             return bit;
+        }
+
+        public static byte SetBit(this byte b, int index, bool value)
+        {
+            int byteIndex = index / 8;
+            int bitIndex = index % 8;
+            byte mask = (byte)(1 << bitIndex);
+
+            b = (byte)(value ? (b | mask) : (b & ~mask));
+
+            return b;
         }
 
         public static string ToOnesAndZeroes(this BitArray bits)

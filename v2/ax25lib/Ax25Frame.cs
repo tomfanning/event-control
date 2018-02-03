@@ -36,11 +36,11 @@ namespace ax25lib
             }
 
             ax25Frame = new Ax25Frame();
-            ax25Frame.Source = getCallsign((getSourceBytes(kissFrame)));
-            ax25Frame.Dest = getCallsign((getDestBytes(kissFrame)));
+            ax25Frame.Source = DecodeCallsign(getSourceBytes(kissFrame), out bool srcIsLast, out bool sourceCBit);
+            ax25Frame.Dest = DecodeCallsign(getDestBytes(kissFrame), out bool destIsLast, out bool destCBit);
             foreach (byte[] digiField in getDigis(kissFrame))
             {
-                string call = getCallsign(digiField);
+                string call = DecodeCallsign(digiField, out bool isLast, out bool cBit);
                 ax25Frame.Digis.Add(call);
             }
             ax25Frame.InfoBytes = getInfo(kissFrame);
@@ -127,15 +127,15 @@ no FCS, dealt with at KISS level?*/
 
             var buffer = new List<byte>();
             buffer.AddRange(new byte[] { 0xc0, 0 }); // FEND, DataFrame
-            buffer.AddRange(EncodeCallsign(Dest));
-            buffer.AddRange(EncodeCallsign(Source));
+            buffer.AddRange(EncodeCallsign(Dest, last:false, cBit:false));
+            buffer.AddRange(EncodeCallsign(Source, last:false, cBit:false));
             foreach (string digiCall in Digis)
             {
-                byte[] digiBytes = EncodeCallsign(digiCall);
+                byte[] digiBytes = EncodeCallsign(digiCall, last: false, cBit: false);
                 buffer.AddRange(digiBytes);
             }
-            byte[] myCall = EncodeCallsign("M0LTE-9", last: true);
-            buffer.AddRange(myCall);
+            //byte[] myCall = EncodeCallsign("M0LTE-9", last: true, cBit:false);
+            //buffer.AddRange(myCall);
             buffer.AddRange(new byte[] { 0x03 }); // control
             buffer.AddRange(new byte[] { 0xF0 }); // proto
             buffer.AddRange(InfoBytes); // info
@@ -143,22 +143,72 @@ no FCS, dealt with at KISS level?*/
 
             return buffer.ToArray();
         }
-        static byte[] EncodeCallsign(string call)
+
+        static byte[] EncodeCallsign(string callAndSsid, bool last, bool cBit)
         {
-            return EncodeCallsign(call, last: false);
-        }
-        static byte[] EncodeCallsign(string call, bool last)
-        {
-            return new byte[7];
+            var parts = (callAndSsid ?? "").Trim().Split('-');
+            if (parts.Length != 1 && parts.Length != 2)
+            {
+                throw new ArgumentException($"Invalid callsign {callAndSsid}");
+            }
+
+            if (string.IsNullOrWhiteSpace(parts[0]))
+            {
+                throw new ArgumentException($"Invalid callsign {parts[0]}");
+            }
+
+            int ssid;
+            if (parts.Length == 1)
+            {
+                ssid = 0;
+            }
+            else
+            {
+                ssid = int.Parse(parts[1]);
+            }
+
+            if (ssid < 0 || ssid > 15)
+            {
+                throw new ArgumentException($"Invalid SSID {ssid} in {callAndSsid}");
+            }
+
+            string call = parts[0].Trim();
+            while (call.Length < 6)
+            {
+                call += " ";
+            }
+
+            // callsign bytes
+            var result = new byte[7];
+            for (int i = 0; i < 6; i++)
+            {
+                result[i] = (byte)(call[i] << 1);
+            }
+
+            // ssid byte
+
+            // bits numbered from the right, per fig 3.5 of http://www.tapr.org/pdf/AX25.2.2.pdf
+
+            // bit 0 (rightmost) is the HDLC address extension bit, set to zero on all but the last octet in the address field, where it is set to one.
+            if (last)
+            {
+                result[6] = result[6].SetBit(0, last);
+            }
+
+            // ssid is next, it's just a 4-bit number, 0-15
+            result[6] = SetSsid(result[6], ssid);
+
+            // reserved bits, set to 1 when not implemented
+            result[6] = result[6].SetBit(5, true); // or should these be set to whatever they were?
+            result[6] = result[6].SetBit(6, true);
+
+            // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
+            result[6] = result[6].SetBit(7, cBit); // ??? should probably be whatever it was before we received it
+
+            return result;
         }
 
-        static string getCallsign(byte[] addressField)
-        {
-            bool isLastAddress;
-            return getCallsign(addressField, out isLastAddress);
-        }
-
-        static string getCallsign(byte[] addressField, out bool isLastAddress)
+        internal static string DecodeCallsign(byte[] addressField, out bool isLastAddress, out bool cBit)
         {
             var sb = new StringBuilder();
             for (int i = 0; i < 6; i++)
@@ -183,7 +233,7 @@ no FCS, dealt with at KISS level?*/
             bool reserved2 = ssidByte.GetBit(6);
 
             // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
-            bool cBit = ssidByte.GetBit(7);
+            cBit = ssidByte.GetBit(7);
 
             if (ssid == 0)
             {
@@ -193,6 +243,18 @@ no FCS, dealt with at KISS level?*/
             {
                 return String.Format("{0}-{1}", call, ssid);
             }
+        }
+
+        static byte SetSsid(byte ssidByte, int ssid)
+        {
+            bool[] bits = ssid.ToBits(4);
+
+            ssidByte = ssidByte.SetBit(1, bits[3]);
+            ssidByte = ssidByte.SetBit(2, bits[2]);
+            ssidByte = ssidByte.SetBit(3, bits[1]);
+            ssidByte = ssidByte.SetBit(4, bits[0]);
+
+            return ssidByte;
         }
 
         /// <summary>
@@ -232,5 +294,33 @@ no FCS, dealt with at KISS level?*/
     {
         public bool Result { get; set; }
         public string FailReason { get; set; }
+    }
+
+    public static class ExtensionMethods
+    {
+        /// <summary>
+        /// Left to right
+        /// </summary>
+        /// <param name="number"></param>
+        /// <returns></returns>
+        public static bool[] ToBits(this int number, int zeroPad)
+        {
+            const int mask = 1;
+            var binary = new List<bool>();
+            while (number > 0)
+            {
+                // Logical AND the number and prepend it to the result string
+                int b = number & mask;
+                binary.Insert(0, b == 0 ? false : true);
+                number = number >> 1;
+            }
+
+            while (binary.Count() < zeroPad)
+            {
+                binary.Insert(0, false);
+            }
+
+            return binary.ToArray();
+        }
     }
 }

@@ -12,7 +12,7 @@ namespace Digipeater
     class Program
     {
         static SerialPort sp;
-        const string MYCALL = "M0LTE-15";
+        //const string MYCALL = "M0LTE-15";
 
         static void Main(string[] args)
         {
