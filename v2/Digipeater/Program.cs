@@ -16,6 +16,11 @@ namespace Digipeater
 
         static void Main(string[] args)
         {
+            // this byte is getting parsed wrong                                                                                           **
+            Process("C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0".ToByteArray());
+            // 
+            return;
+
             using (sp = new SerialPort("COM4", 38400))
             {
                 sp.Open();
@@ -101,6 +106,8 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
 																									RX: 1100101            RX: 11110011
 																									TX: 1100100            TX: 11100011
 																									          *                   *
+                                                                                                              *                   1001 = 9
+                                                                                                              *                   0001 = 1
              */
             Console.Write(" RX: ");
             Console.WriteLine(unescaped.ToHexString());
@@ -256,6 +263,8 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
 
             return result.ToArray();
         }
+
+
     }
 
     static class ExtensionMethods
@@ -263,6 +272,16 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
         public static string ToHexString(this IEnumerable<byte> bytes)
         {
             return string.Join(" ", bytes.Select(b => String.Format("{0:X2}", b)));
+        }
+
+        public static byte[] ToByteArray(this string hexRaw)
+        {
+            string hex = hexRaw.Replace(" ", "");
+
+            return Enumerable.Range(0, hex.Length)
+                             .Where(x => x % 2 == 0)
+                             .Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
+                             .ToArray();
         }
     }
 }

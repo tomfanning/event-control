@@ -69,11 +69,15 @@ namespace ax25lib
             ax25Frame = new Ax25Frame();
             ax25Frame.Source = DecodeCallsign(getSourceBytes(kissFrame));
             ax25Frame.Dest = DecodeCallsign(getDestBytes(kissFrame));
-            foreach (byte[] digiField in getDigis(kissFrame))
+
+            byte[][] digis = getDigis(kissFrame);
+            foreach (byte[] digiField in digis)
             {
                 CallField call = DecodeCallsign(digiField);
+                Debug.WriteLine(call);
                 ax25Frame.Digis.Add(call);
             }
+
             ax25Frame.InfoBytes = getInfo(kissFrame);
             ax25Frame.Info = Encoding.ASCII.GetString(ax25Frame.InfoBytes);
 
@@ -309,7 +313,7 @@ no FCS, dealt with at KISS level?*/
 
             int ssid = 0;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
                 if (ssidBits[i])
                     ssid |= 1 << i;
