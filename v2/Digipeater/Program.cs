@@ -16,15 +16,17 @@ namespace Digipeater
 
         static void Main(string[] args)
         {
-            // this byte is getting parsed wrong                                                                                           **
-            Process("C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0".ToByteArray());
-            // 
-            return;
-
-            using (sp = new SerialPort("COM4", 38400))
+            using (sp = new SerialPort("COM2", 38400))
             {
                 sp.Open();
-                //sp.ReadTimeout = 100;
+
+                while (false)
+                {
+                    Console.WriteLine("Press enter for a packet");
+                    Console.ReadLine();
+                    byte[] buf1 = "C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0".ToByteArray();
+                    sp.Write(buf1, 0, buf1.Length);
+                }
 
                 var buf = new List<byte>();
 
@@ -45,7 +47,6 @@ namespace Digipeater
                                 Process(buf.ToArray());
                                 buf.Clear();
                                 midPacket = false;
-                                Console.WriteLine("Waiting...");
                             }
                         }
                         else
@@ -69,7 +70,7 @@ namespace Digipeater
         }
 
         const string MYCALL = "M0LTE-9";
-
+        static int rxpkt, txpkt;
         static void Process(byte[] inboundKissFrameFromModem)
         {
             byte[] unescaped = UnescapeFrameFromModem(inboundKissFrameFromModem);
@@ -94,8 +95,6 @@ namespace Digipeater
             txFrame.InfoBytes = rxFrame.InfoBytes;
             byte[] txBytes = txFrame.ToKissFrame();
 
-            Ax25Frame.TryParse(txBytes, out Ax25Frame checkFrame);
-
             /*
              DEST                   SOURCE                 DIGI 1                 DIGI 2                 DIGI 3                 INFO                                     FEND
  RX: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
@@ -109,7 +108,11 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
                                                                                                               *                   1001 = 9
                                                                                                               *                   0001 = 1
              */
-            Console.Write(" RX: ");
+
+            rxpkt++;
+            Console.WriteLine($"RX {rxpkt}: {rxFrame.Source}>{rxFrame.Dest} via {String.Join(",", rxFrame.Digis.Select(c => c.Call))}");
+
+            /*Console.Write(" RX: ");
             Console.WriteLine(unescaped.ToHexString());
             Console.Write(" TX: ");
             Console.WriteLine(txBytes.ToHexString());
@@ -141,10 +144,12 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
             {
                 Console.WriteLine($"      Check: {digi}");
             }
-            Console.WriteLine();
+            Console.WriteLine();*/
 
-            if (false)
+            if (true)
             {
+                txpkt++;
+                Console.WriteLine($"TX {txpkt}: {txFrame.Source}>{txFrame.Dest} via {String.Join(",", txFrame.Digis.Select(c => c.Call))}");
                 byte[] escapedForTransmit = EscapeFrameForSending(txBytes);
                 sp.Write(escapedForTransmit, 0, escapedForTransmit.Length);
             }
