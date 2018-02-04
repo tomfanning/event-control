@@ -12,11 +12,17 @@ namespace ax25lib
     {
         public CallField()
         {
-            Bit5Reserved = Bit6Reserved = true;
+            Bit5Reserved = Bit6Reserved = true; // 1 if unimplemented
         }
 
         public string Call { get; set; }
-        public bool CBit { get; set; }
+
+        /// <summary>
+        /// <para>In the destination field, this is the AX.25 command/response (C) bit.</para>
+        /// <para>In the repeater field, this is the Is Repeated (H) bit.</para>
+        /// </summary>
+        public bool CHBit { get; set; }
+
         public bool IsLast { get; set; }
 
         public bool Bit5Reserved { get; set; }
@@ -24,7 +30,12 @@ namespace ax25lib
 
         public override string ToString()
         {
-            return $"{Call ?? "NULL"} CBit={(CBit ? 1 : 0)} IsLast={(IsLast ? 1 : 0)} Res={(Bit6Reserved ? 1 : 0)}{(Bit5Reserved ? 1 : 0)}";
+            return $"{Call ?? "NULL"} CBit={(CHBit ? 1 : 0)} IsLast={(IsLast ? 1 : 0)} Res={(Bit6Reserved ? 1 : 0)}{(Bit5Reserved ? 1 : 0)}";
+        }
+
+        public CallField Clone()
+        {
+            throw new NotImplementedException();
         }
     }
     public class Ax25Frame
@@ -149,13 +160,16 @@ no FCS, dealt with at KISS level?*/
             buffer.AddRange(new byte[] { 0xc0, 0 }); // FEND, DataFrame
             buffer.AddRange(EncodeCallsign(Dest));
             buffer.AddRange(EncodeCallsign(Source));
-            foreach (CallField digiCall in Digis)
+
+            for (int i=0; i< Digis.Count; i++)
             {
+                // for the routing info, we need to set the IsLast bit ourselves because we know better, otherwise should pass through as-is.
+                var digiCall = Digis[i];
+                digiCall.IsLast = i + 1 == Digis.Count;
                 byte[] digiBytes = EncodeCallsign(digiCall);
                 buffer.AddRange(digiBytes);
             }
-            //byte[] myCall = EncodeCallsign("M0LTE-9", last: true, cBit:false);
-            //buffer.AddRange(myCall);
+
             buffer.AddRange(new byte[] { 0x03 }); // control
             buffer.AddRange(new byte[] { 0xF0 }); // proto
             buffer.AddRange(InfoBytes); // info
@@ -222,7 +236,7 @@ no FCS, dealt with at KISS level?*/
             result[6] = result[6].SetBit(6, cf.Bit6Reserved);
 
             // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
-            result[6] = result[6].SetBit(7, cf.CBit); 
+            result[6] = result[6].SetBit(7, cf.CHBit); 
 
             return result;
         }
@@ -254,7 +268,7 @@ no FCS, dealt with at KISS level?*/
             bool reserved2 = ssidByte.GetBit(6);
 
             // command/response bit of an LA PA frame, see section 6.1.2 of http://www.tapr.org/pdf/AX25.2.2.pdf
-            result.CBit = ssidByte.GetBit(7);
+            result.CHBit = ssidByte.GetBit(7);
 
             if (ssid == 0)
             {
