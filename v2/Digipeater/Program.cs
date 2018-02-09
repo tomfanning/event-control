@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Digipeater
@@ -26,6 +27,7 @@ namespace Digipeater
                     Console.ReadLine();
                     byte[] buf1 = "C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0".ToByteArray();
                     sp.Write(buf1, 0, buf1.Length);
+                    //Thread.Sleep(10000);
                 }
 
                 var buf = new List<byte>();
@@ -96,18 +98,21 @@ namespace Digipeater
             byte[] txBytes = txFrame.ToKissFrame();
 
             /*
-             DEST                   SOURCE                 DIGI 1                 DIGI 2                 DIGI 3                 INFO                                     FEND
- RX: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
- TX: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 64   9A 60 98 A8 8A 40 F3   03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
-CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 64   9A 60 98 A8 8A 40 E3   03 F0 27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
-                                                                                                       
-																									   
-																									RX: 1100101            RX: 11110011
-																									TX: 1100100            TX: 11100011
-																									          *                   *
-                                                                                                              *                   1001 = 9
-                                                                                                              *                   0001 = 1
-             */
+            DEST                             SOURCE                                  DIGI 1                 DIGI 2                 DIGI 3                 DELIM    INFO                               FEND
+RX:         UQRVUQ CBit=0 IsLast=0 Res=11  < M0LTE-5 CBit=1 IsLast=0 Res=11    via   WIDE1-1                WIDE2-2
+RX: C0 00   AA A2 A4 AC AA A2 60             9A 60 98 A8 8A 40 EA                    AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 65                          03 F0    27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
+TX: C0 00   AA A2 A4 AC AA A2 60             9A 60 98 A8 8A 40 EA                    AE 92 88 8A 62 40 62   AE 92 88 8A 64 40 64   9A 60 98 A8 8A 40 F3   03 F0    27 77 59 44 6C 20 1C 5B 2F 3E 0D   C0
+TX:         UQRVUQ CBit=0 IsLast=0 Res=11  < M0LTE-5 CBit=1 IsLast=0 Res=11    via   WIDE1-1                WIDE2-2                M0LTE-9 (islast=1)
+
+            header
+            dest the same
+            source the same
+            start looking for delim
+            all digis the same apart from set previous last digi islast to false
+            then append own call with islast = true
+            info the same
+            fend the same
+            */
 
             rxpkt++;
             Console.WriteLine($"RX {rxpkt}: {rxFrame.Source}>{rxFrame.Dest} via {String.Join(",", rxFrame.Digis.Select(c => c.Call))}");
@@ -115,8 +120,8 @@ CHK: C0 00   AA A2 A4 AC AA A2 60   9A 60 98 A8 8A 40 EA   AE 92 88 8A 62 40 62 
             /*Console.Write(" RX: ");
             Console.WriteLine(unescaped.ToHexString());
             Console.Write(" TX: ");
-            Console.WriteLine(txBytes.ToHexString());
-            Console.Write("CHK: ");
+            Console.WriteLine(txBytes.ToHexString());*/
+            /*Console.Write("CHK: ");
             Console.WriteLine(checkFrame.ToKissFrame().ToHexString());
             Console.WriteLine();
 
